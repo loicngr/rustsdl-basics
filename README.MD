@@ -1,0 +1,1 @@
+![Project SDL2 struct](struct.png)
