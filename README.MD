@@ -5,4 +5,9 @@
  - [other](https://www.libsdl.org/projects/)
  - [gfx](https://sourceforge.net/projects/sdl2gfx/)
 
+## Structure global
+![Project struct](base_struct.png)
+## Structure sdl lib
 ![Project SDL2 struct](struct.png)
+## Structure sdl release
+![Project SDL2 struct](release_struct.png)
