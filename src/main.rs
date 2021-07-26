@@ -1,9 +1,49 @@
 extern crate sdl2;
 
 use sdl2::image::{InitFlag, LoadTexture};
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::rect::Rect;
+use sdl2::render::{Texture, WindowCanvas};
 use std::path::Path;
 use std::time::Duration;
-use sdl2::rect::Rect;
+
+const TILES_SIZE: u32 = 16;
+const TILES_MARGIN: u32 = 1;
+
+const TILE_ITEM_DIRT_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 6);
+
+/// Draw map in canvas
+fn draw_map(canvas: &mut WindowCanvas, texture_game_sheet: &Texture) {
+    let mut canvas_pos_y_count = 0;
+    let mut canvas_pos_x_count = 0;
+    let (canvas_width, canvas_height) = canvas.window().size();
+
+    // Boucle dans les pixels en Y de la window
+    for canvas_pos_y in 0..canvas_height {
+        if canvas_pos_y == canvas_pos_y_count {
+            // Boucle dans les pixels en X de la window
+            for canvas_pos_x in 0..canvas_width {
+                if canvas_pos_x == canvas_pos_x_count {
+                    canvas.copy(
+                        &texture_game_sheet,
+                        Rect::new(TILE_ITEM_DIRT_POS as i32, 0, TILES_SIZE, TILES_SIZE),
+                        Rect::new(
+                            canvas_pos_x as i32,
+                            canvas_pos_y as i32,
+                            TILES_SIZE,
+                            TILES_SIZE,
+                        ),
+                    );
+
+                    canvas_pos_x_count += TILES_SIZE;
+                }
+            }
+
+            canvas_pos_x_count = 0;
+            canvas_pos_y_count += TILES_SIZE;
+        }
+    }
+}
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init()?;
@@ -11,23 +51,22 @@ pub fn main() -> Result<(), String> {
     let video_subsystem = sdl_context.video()?;
 
     let window = video_subsystem
-        .window("test kappa image", 800, 600)
+        .window("unknowsystem", 1200, 720)
         .position_centered()
         .build()
         .map_err(|e| e.to_string())?;
 
-    let mut canvas = window
-        .into_canvas()
-        .build()
-        .map_err(|e| e.to_string())?;
+    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     let texture_creator = canvas.texture_creator();
-    let png = Path::new("assets/kappa.png");
-    let texture = texture_creator.load_texture(png)?;
+    canvas.clear();
 
-    let mut texture_rect = Rect::new(0, 0, 400, 300);
-    canvas.copy(&texture, None, texture_rect);
+    let game_sheet = Path::new("assets/Spritesheet/roguelikeSheet_transparent.png");
+    let texture_game_sheet = texture_creator.load_texture(game_sheet)?;
+
+    // Draw de la map
+    draw_map(&mut canvas, &texture_game_sheet);
+
     canvas.present();
-
     let mut event_pump = sdl_context.event_pump()?;
     'main_loop: loop {
         for event in event_pump.poll_iter() {
@@ -38,22 +77,6 @@ pub fn main() -> Result<(), String> {
                     ..
                 } => break 'main_loop,
                 _ => {}
-            }
-        }
-
-
-        let new_y = texture_rect.y() + 1;
-        if (new_y + 300) < canvas.window().size().1 as i32 {
-            canvas.clear();
-            texture_rect.set_y(new_y);
-            canvas.copy(&texture, None, texture_rect);
-        } else {
-            let new_x = texture_rect.x() + 1;
-
-            if (new_x + 400) < canvas.window().size().0 as i32 {
-                canvas.clear();
-                texture_rect.set_x(new_x);
-                canvas.copy(&texture, None, texture_rect);
             }
         }
 
