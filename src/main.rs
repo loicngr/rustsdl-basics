@@ -4,6 +4,7 @@ use sdl2::image::{InitFlag, LoadTexture};
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::{Texture, WindowCanvas};
+use std::net::Shutdown::Read;
 use std::path::Path;
 use std::time::Duration;
 
@@ -12,14 +13,62 @@ const WINDOW_SIZES: (u32, u32) = (1200, 720);
 const TILES_SIZE: u32 = 16;
 const TILES_MARGIN: u32 = 1;
 
-const TILE_ITEM_DIRT_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 6);
-const TILE_ITEM_PLAYER_TURN_LEFT_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 23);
-const TILE_ITEM_PLAYER_TURN_RIGHT_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 26);
-const TILE_ITEM_PLAYER_TURN_UP_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 25);
-const TILE_ITEM_PLAYER_TURN_DOWN_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 24);
+const TILE_ITEM_DIRT_POS: (i32, i32) = (
+    ((TILES_SIZE + TILES_MARGIN) * 6) as i32,
+    ((TILES_SIZE + TILES_MARGIN) * 18) as i32,
+);
+const TILE_ITEM_PLAYER_TURN_LEFT_POS: i32 = ((TILES_SIZE + TILES_MARGIN) * 23) as i32;
+const TILE_ITEM_PLAYER_TURN_RIGHT_POS: i32 = ((TILES_SIZE + TILES_MARGIN) * 26) as i32;
+const TILE_ITEM_PLAYER_TURN_UP_POS: i32 = ((TILES_SIZE + TILES_MARGIN) * 25) as i32;
+const TILE_ITEM_PLAYER_TURN_DOWN_POS: i32 = ((TILES_SIZE + TILES_MARGIN) * 24) as i32;
+
+struct PlayerState {
+    x: i32,
+    y: i32,
+    entity: Rect,
+}
+
+struct LevelState {
+    x: i32,
+    y: i32,
+    texture: (i32, i32),
+}
+
+impl PlayerState {
+    fn update_x(&mut self, new_x: i32) {
+        self.x = self.entity.x();
+        self.entity.set_x(new_x);
+    }
+
+    fn update_y(&mut self, new_y: i32) {
+        self.y = self.entity.y();
+        self.entity.set_y(new_y);
+    }
+}
+
+struct AppSate {
+    player: PlayerState,
+    level: Vec<LevelState>,
+}
+
+impl AppSate {
+    fn new() -> AppSate {
+        let player_x = (WINDOW_SIZES.0 / 2) as i32;
+        let player_y = (WINDOW_SIZES.1 / 2) as i32;
+
+        AppSate {
+            player: PlayerState {
+                x: player_x,
+                y: player_y,
+                entity: Rect::new(player_x, player_y, TILES_SIZE, TILES_SIZE),
+            },
+            level: vec![],
+        }
+    }
+}
 
 /// Draw map in canvas
-fn draw_map(canvas: &mut WindowCanvas, texture_game_sheet: &Texture) {
+fn draw_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
     let mut canvas_pos_y_count = 0;
     let mut canvas_pos_x_count = 0;
     let (canvas_width, canvas_height) = canvas.window().size();
@@ -30,9 +79,19 @@ fn draw_map(canvas: &mut WindowCanvas, texture_game_sheet: &Texture) {
             // Boucle dans les pixels en X de la window
             for canvas_pos_x in 0..canvas_width {
                 if canvas_pos_x == canvas_pos_x_count {
+                    app_state.level.push(LevelState {
+                        x: canvas_pos_x as i32,
+                        y: canvas_pos_y as i32,
+                        texture: TILE_ITEM_DIRT_POS,
+                    });
                     canvas.copy(
-                        &texture_game_sheet,
-                        Rect::new(TILE_ITEM_DIRT_POS as i32, 0, TILES_SIZE, TILES_SIZE),
+                        &sheet,
+                        Rect::new(
+                            TILE_ITEM_DIRT_POS.0,
+                            TILE_ITEM_DIRT_POS.1,
+                            TILES_SIZE,
+                            TILES_SIZE,
+                        ),
                         Rect::new(
                             canvas_pos_x as i32,
                             canvas_pos_y as i32,
@@ -52,23 +111,26 @@ fn draw_map(canvas: &mut WindowCanvas, texture_game_sheet: &Texture) {
 }
 
 /// Draw player in canvas
-fn draw_player(canvas: &mut WindowCanvas, sheet: &Texture) {
+fn draw_player(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
     canvas.copy(
         &sheet,
-        Rect::new(TILE_ITEM_PLAYER_TURN_DOWN_POS as i32, 0, TILES_SIZE, TILES_SIZE),
         Rect::new(
-            (WINDOW_SIZES.0 / 2) as i32,
-            (WINDOW_SIZES.1 / 2) as i32,
+            TILE_ITEM_PLAYER_TURN_DOWN_POS as i32,
+            0,
             TILES_SIZE,
             TILES_SIZE,
         ),
+        app_state.player.entity,
     );
+
+    // todo: Replace map at old player poss
 }
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init()?;
     let _sdl2_context_image = sdl2::image::init(InitFlag::PNG | InitFlag::JPG)?;
     let video_subsystem = sdl_context.video()?;
+    let mut app_state = AppSate::new();
 
     let window = video_subsystem
         .window("unknowsystem", WINDOW_SIZES.0, WINDOW_SIZES.1)
@@ -80,21 +142,21 @@ pub fn main() -> Result<(), String> {
     let texture_creator = canvas.texture_creator();
     canvas.clear();
 
-    let game_sheet_1 = Path::new("assets/Spritesheet/roguelikeSheet_transparent.png");
-    let game_sheet_2 = Path::new("assets/Tilemap/tilemap.png");
+    let game_sheet = Path::new("assets/tilemap/tilemap.png");
+    let texture_game_sheet = texture_creator.load_texture(game_sheet)?;
 
     // Draw de la map
-    let texture_game_sheet_1 = texture_creator.load_texture(game_sheet_1)?;
-    draw_map(&mut canvas, &texture_game_sheet_1);
+    draw_map(&mut app_state, &mut canvas, &texture_game_sheet);
 
     // Draw du player
-    let texture_game_sheet_2 = texture_creator.load_texture(game_sheet_2)?;
-    draw_player(&mut canvas, &texture_game_sheet_2);
+    draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
 
     canvas.present();
     let mut event_pump = sdl_context.event_pump()?;
     'main_loop: loop {
         for event in event_pump.poll_iter() {
+            let player_entity = &app_state.player.entity;
+
             match event {
                 sdl2::event::Event::Quit { .. }
                 | sdl2::event::Event::KeyDown {
@@ -105,26 +167,44 @@ pub fn main() -> Result<(), String> {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Down),
                     ..
                 } => {
-                    // move player down
-                },
+                    let new_pos = player_entity.y() + TILES_SIZE as i32;
+                    if new_pos < (canvas.window().size().1 - TILES_SIZE) as i32 {
+                        app_state.player.update_y(new_pos);
+                        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+                    }
+                }
                 sdl2::event::Event::KeyDown {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Up),
                     ..
                 } => {
-                    // move player up
-                },
+                    let new_pos = player_entity.y() - TILES_SIZE as i32;
+                    if (player_entity.y() - TILES_SIZE as i32) > 0 {
+                        app_state.player.update_y(new_pos);
+                        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+                    }
+                }
                 sdl2::event::Event::KeyDown {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Left),
                     ..
                 } => {
-                    // move player turn left
-                },
+                    let new_pos = player_entity.x() - TILES_SIZE as i32;
+                    if (player_entity.x() - TILES_SIZE as i32) > 0 {
+                        app_state.player.update_x(new_pos);
+                        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+                    }
+                }
                 sdl2::event::Event::KeyDown {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Right),
                     ..
                 } => {
-                    // move player turn right
-                },
+                    let new_pos = player_entity.x() + TILES_SIZE as i32;
+                    if (player_entity.x() + TILES_SIZE as i32)
+                        < (canvas.window().size().0 - TILES_SIZE) as i32
+                    {
+                        app_state.player.update_x(new_pos);
+                        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+                    }
+                }
                 _ => {}
             }
         }
