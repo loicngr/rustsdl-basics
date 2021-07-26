@@ -7,10 +7,16 @@ use sdl2::render::{Texture, WindowCanvas};
 use std::path::Path;
 use std::time::Duration;
 
+const WINDOW_SIZES: (u32, u32) = (1200, 720);
+
 const TILES_SIZE: u32 = 16;
 const TILES_MARGIN: u32 = 1;
 
 const TILE_ITEM_DIRT_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 6);
+const TILE_ITEM_PLAYER_TURN_LEFT_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 23);
+const TILE_ITEM_PLAYER_TURN_RIGHT_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 26);
+const TILE_ITEM_PLAYER_TURN_UP_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 25);
+const TILE_ITEM_PLAYER_TURN_DOWN_POS: u32 = ((TILES_SIZE + TILES_MARGIN) * 24);
 
 /// Draw map in canvas
 fn draw_map(canvas: &mut WindowCanvas, texture_game_sheet: &Texture) {
@@ -45,13 +51,27 @@ fn draw_map(canvas: &mut WindowCanvas, texture_game_sheet: &Texture) {
     }
 }
 
+/// Draw player in canvas
+fn draw_player(canvas: &mut WindowCanvas, sheet: &Texture) {
+    canvas.copy(
+        &sheet,
+        Rect::new(TILE_ITEM_PLAYER_TURN_DOWN_POS as i32, 0, TILES_SIZE, TILES_SIZE),
+        Rect::new(
+            (WINDOW_SIZES.0 / 2) as i32,
+            (WINDOW_SIZES.1 / 2) as i32,
+            TILES_SIZE,
+            TILES_SIZE,
+        ),
+    );
+}
+
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init()?;
     let _sdl2_context_image = sdl2::image::init(InitFlag::PNG | InitFlag::JPG)?;
     let video_subsystem = sdl_context.video()?;
 
     let window = video_subsystem
-        .window("unknowsystem", 1200, 720)
+        .window("unknowsystem", WINDOW_SIZES.0, WINDOW_SIZES.1)
         .position_centered()
         .build()
         .map_err(|e| e.to_string())?;
@@ -60,11 +80,16 @@ pub fn main() -> Result<(), String> {
     let texture_creator = canvas.texture_creator();
     canvas.clear();
 
-    let game_sheet = Path::new("assets/Spritesheet/roguelikeSheet_transparent.png");
-    let texture_game_sheet = texture_creator.load_texture(game_sheet)?;
+    let game_sheet_1 = Path::new("assets/Spritesheet/roguelikeSheet_transparent.png");
+    let game_sheet_2 = Path::new("assets/Tilemap/tilemap.png");
 
     // Draw de la map
-    draw_map(&mut canvas, &texture_game_sheet);
+    let texture_game_sheet_1 = texture_creator.load_texture(game_sheet_1)?;
+    draw_map(&mut canvas, &texture_game_sheet_1);
+
+    // Draw du player
+    let texture_game_sheet_2 = texture_creator.load_texture(game_sheet_2)?;
+    draw_player(&mut canvas, &texture_game_sheet_2);
 
     canvas.present();
     let mut event_pump = sdl_context.event_pump()?;
@@ -76,6 +101,30 @@ pub fn main() -> Result<(), String> {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Escape),
                     ..
                 } => break 'main_loop,
+                sdl2::event::Event::KeyDown {
+                    keycode: Option::Some(sdl2::keyboard::Keycode::Down),
+                    ..
+                } => {
+                    // move player down
+                },
+                sdl2::event::Event::KeyDown {
+                    keycode: Option::Some(sdl2::keyboard::Keycode::Up),
+                    ..
+                } => {
+                    // move player up
+                },
+                sdl2::event::Event::KeyDown {
+                    keycode: Option::Some(sdl2::keyboard::Keycode::Left),
+                    ..
+                } => {
+                    // move player turn left
+                },
+                sdl2::event::Event::KeyDown {
+                    keycode: Option::Some(sdl2::keyboard::Keycode::Right),
+                    ..
+                } => {
+                    // move player turn right
+                },
                 _ => {}
             }
         }
