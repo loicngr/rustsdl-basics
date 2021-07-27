@@ -4,6 +4,8 @@
  - [dev sdl](https://libsdl.org/download-2.0.php)
  - [other](https://www.libsdl.org/projects/)
  - [gfx](https://sourceforge.net/projects/sdl2gfx/)
+## View other branches for more code :)
+ - [branches](https://github.com/loicngr/rustsdl-basics/branches)
 
 ## Structure global
 ![Project struct](base_struct.png)
