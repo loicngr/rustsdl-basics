@@ -113,22 +113,38 @@ fn draw_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture)
 
 /// Draw player in canvas
 fn draw_player(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
+    let player_x = app_state.player.entity.x();
+    let player_y = app_state.player.entity.y();
+
+    let old_player_x = app_state.player.x;
+    let old_player_y = app_state.player.y;
+
+    let player_tile: i32 = {
+        if old_player_x != player_x {
+            if old_player_x > player_x {
+                TILE_ITEM_PLAYER_TURN_LEFT_POS as i32
+            } else {
+                TILE_ITEM_PLAYER_TURN_RIGHT_POS as i32
+            }
+        } else {
+            if old_player_y > player_y {
+                TILE_ITEM_PLAYER_TURN_UP_POS as i32
+            } else {
+                TILE_ITEM_PLAYER_TURN_DOWN_POS as i32
+            }
+        }
+    };
+
     canvas.copy(
         &sheet,
         Rect::new(
-            TILE_ITEM_PLAYER_TURN_DOWN_POS as i32,
+            player_tile,
             0,
             TILES_SIZE,
             TILES_SIZE,
         ),
         app_state.player.entity,
     );
-
-    let player_x = app_state.player.entity.x();
-    let player_y = app_state.player.entity.y();
-
-    let old_player_x = app_state.player.x;
-    let old_player_y = app_state.player.y;
 
     // Player move from x position
     // so we need to redraw behind player
