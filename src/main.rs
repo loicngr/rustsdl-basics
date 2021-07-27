@@ -53,8 +53,8 @@ struct AppSate {
 
 impl AppSate {
     fn new() -> AppSate {
-        let player_x = (WINDOW_SIZES.0 / 2) as i32;
-        let player_y = (WINDOW_SIZES.1 / 2) as i32;
+        let player_x = 0 as i32;
+        let player_y = 0 as i32;
 
         AppSate {
             player: PlayerState {
@@ -72,6 +72,7 @@ fn draw_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture)
     let mut canvas_pos_y_count = 0;
     let mut canvas_pos_x_count = 0;
     let (canvas_width, canvas_height) = canvas.window().size();
+    app_state.level.clear();
 
     // Boucle dans les pixels en Y de la window
     for canvas_pos_y in 0..canvas_height {
@@ -123,7 +124,48 @@ fn draw_player(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Textu
         app_state.player.entity,
     );
 
-    // todo: Replace map at old player poss
+    let player_x = app_state.player.entity.x();
+    let player_y = app_state.player.entity.y();
+
+    let old_player_x = app_state.player.x;
+    let old_player_y = app_state.player.y;
+
+    // Player move from x position
+    // so we need to redraw behind player
+    if old_player_x != player_x {
+        if let Some(level_position) = app_state
+            .level
+            .iter()
+            .position(|lvl| lvl.x == old_player_x)
+        {
+            let level = app_state.level.get(level_position).unwrap();
+            canvas.copy(
+                &sheet,
+                Rect::new(level.texture.0, level.texture.1, TILES_SIZE, TILES_SIZE),
+                Rect::new(old_player_x, player_y, TILES_SIZE, TILES_SIZE),
+            );
+        }
+    }
+    // Player move from y position
+    // so we need to redraw behind player
+    else if old_player_y != player_y {
+        if let Some(level_position) = app_state
+            .level
+            .iter()
+            .position(|lvl| lvl.y == old_player_y)
+        {
+            let level = app_state.level.get(level_position).unwrap();
+            canvas.copy(
+                &sheet,
+                Rect::new(level.texture.0, level.texture.1, TILES_SIZE, TILES_SIZE),
+                Rect::new(player_x, old_player_y, TILES_SIZE, TILES_SIZE),
+            );
+        }
+    }
+
+    // Reset old player position
+    app_state.player.update_x(player_x);
+    app_state.player.update_y(player_y);
 }
 
 pub fn main() -> Result<(), String> {
