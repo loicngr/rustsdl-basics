@@ -1,5 +1,6 @@
 extern crate sdl2;
 
+use rand::Rng;
 use sdl2::image::{InitFlag, LoadTexture};
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
@@ -8,7 +9,7 @@ use std::net::Shutdown::Read;
 use std::path::Path;
 use std::time::Duration;
 
-const WINDOW_SIZES: (u32, u32) = (1200, 720);
+const WINDOW_SIZES: (u32, u32) = (640, 640);
 
 const TILES_SIZE: u32 = 16;
 const TILES_MARGIN: u32 = 1;
@@ -17,21 +18,44 @@ const TILE_ITEM_DIRT_POS: (i32, i32) = (
     ((TILES_SIZE + TILES_MARGIN) * 6) as i32,
     ((TILES_SIZE + TILES_MARGIN) * 18) as i32,
 );
+const TILE_ITEM_SAND_POS: (i32, i32) = (
+    ((TILES_SIZE + TILES_MARGIN) * 8) as i32,
+    ((TILES_SIZE + TILES_MARGIN) * 18) as i32,
+);
 const TILE_ITEM_PLAYER_TURN_LEFT_POS: i32 = ((TILES_SIZE + TILES_MARGIN) * 23) as i32;
 const TILE_ITEM_PLAYER_TURN_RIGHT_POS: i32 = ((TILES_SIZE + TILES_MARGIN) * 26) as i32;
 const TILE_ITEM_PLAYER_TURN_UP_POS: i32 = ((TILES_SIZE + TILES_MARGIN) * 25) as i32;
 const TILE_ITEM_PLAYER_TURN_DOWN_POS: i32 = ((TILES_SIZE + TILES_MARGIN) * 24) as i32;
 
+const MAP_SIZES: (i32, i32) = ((WINDOW_SIZES.0 as i32 * 4), (WINDOW_SIZES.1 as i32 * 4));
+
+#[derive(Debug, Copy, Clone)]
+struct PlayerCamera {
+    sizes: (u32, u32),
+}
+
+#[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
+enum PlayerAnimation {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Debug, Copy, Clone)]
 struct PlayerState {
     x: i32,
     y: i32,
+    animation: Option<PlayerAnimation>,
     entity: Rect,
+    camera: PlayerCamera,
 }
 
+#[derive(Debug, Copy, Clone)]
 struct LevelState {
     x: i32,
     y: i32,
-    texture: (i32, i32),
+    texture: (Rect, Rect),
 }
 
 impl PlayerState {
@@ -46,6 +70,7 @@ impl PlayerState {
     }
 }
 
+#[derive(Debug)]
 struct AppSate {
     player: PlayerState,
     level: Vec<LevelState>,
@@ -53,60 +78,102 @@ struct AppSate {
 
 impl AppSate {
     fn new() -> AppSate {
-        let player_x = 0 as i32;
-        let player_y = 0 as i32;
+        let player_x = 320 as i32;
+        let player_y = 320 as i32;
 
         AppSate {
             player: PlayerState {
                 x: player_x,
                 y: player_y,
+                animation: Some(PlayerAnimation::Down),
                 entity: Rect::new(player_x, player_y, TILES_SIZE, TILES_SIZE),
+                camera: PlayerCamera {
+                    sizes: (WINDOW_SIZES.0 / 5, WINDOW_SIZES.1 / 5),
+                },
             },
             level: vec![],
         }
     }
 }
 
-/// Draw map in canvas
-fn draw_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
-    let mut canvas_pos_y_count = 0;
-    let mut canvas_pos_x_count = 0;
-    let (canvas_width, canvas_height) = canvas.window().size();
-    app_state.level.clear();
+/// Generate the map and save it in vec
+fn generate_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
+    let mut map_pos_y_count = 0;
+    let mut map_pos_x_count = 0;
+    let (map_width, map_height) = MAP_SIZES;
 
-    // Boucle dans les pixels en Y de la window
-    for canvas_pos_y in 0..canvas_height {
-        if canvas_pos_y == canvas_pos_y_count {
-            // Boucle dans les pixels en X de la window
-            for canvas_pos_x in 0..canvas_width {
-                if canvas_pos_x == canvas_pos_x_count {
+    let start_x = 0;
+    let end_x = map_width;
+
+    let start_y = 0;
+    let end_y = map_height;
+
+    let mut rng = rand::thread_rng();
+    for map_pos_y in start_y..end_y {
+        if map_pos_y == map_pos_y_count {
+            for map_pos_x in start_x..end_x {
+                if map_pos_x == map_pos_x_count {
+                    let random_number: bool = rng.gen();
+
+                    let mut tile: (i32, i32);
+                    if random_number {
+                        tile = TILE_ITEM_DIRT_POS;
+                    } else {
+                        tile = TILE_ITEM_SAND_POS
+                    }
+
+                    let texture_src: Rect = Rect::new(tile.0, tile.1, TILES_SIZE, TILES_SIZE);
+                    let texture_dst: Rect =
+                        Rect::new(map_pos_x as i32, map_pos_y as i32, TILES_SIZE, TILES_SIZE);
+
                     app_state.level.push(LevelState {
-                        x: canvas_pos_x as i32,
-                        y: canvas_pos_y as i32,
-                        texture: TILE_ITEM_DIRT_POS,
+                        x: map_pos_x as i32,
+                        y: map_pos_y as i32,
+                        texture: (texture_src, texture_dst),
                     });
-                    canvas.copy(
-                        &sheet,
-                        Rect::new(
-                            TILE_ITEM_DIRT_POS.0,
-                            TILE_ITEM_DIRT_POS.1,
-                            TILES_SIZE,
-                            TILES_SIZE,
-                        ),
-                        Rect::new(
-                            canvas_pos_x as i32,
-                            canvas_pos_y as i32,
-                            TILES_SIZE,
-                            TILES_SIZE,
-                        ),
-                    );
 
-                    canvas_pos_x_count += TILES_SIZE;
+                    map_pos_x_count += TILES_SIZE as i32;
                 }
             }
 
-            canvas_pos_x_count = 0;
-            canvas_pos_y_count += TILES_SIZE;
+            map_pos_x_count = 0;
+            map_pos_y_count += TILES_SIZE as i32;
+        }
+    }
+}
+
+/// Draw map in canvas
+fn draw_camera_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
+    let start_x: i32 = app_state.player.x as i32 - (app_state.player.camera.sizes.0 as i32 / 2);
+    let end_x: i32 = app_state.player.x as i32 + (app_state.player.camera.sizes.0 as i32 / 2);
+
+    let start_y: i32 = app_state.player.y as i32 - (app_state.player.camera.sizes.0 as i32 / 2);
+    let end_y: i32 = app_state.player.y as i32 + (app_state.player.camera.sizes.0 as i32 / 2);
+
+    let mut view_pos_y_count: i32 = start_y;
+    let mut view_pos_x_count: i32 = start_x;
+
+    for view_pos_y in start_y..end_y {
+        if view_pos_y == view_pos_y_count {
+            for view_pos_x in start_x..end_x {
+                if view_pos_x == view_pos_x_count {
+                    let current_position = (view_pos_x, view_pos_y);
+                    if let Some(find_level) = app_state
+                        .level
+                        .iter()
+                        .find(|&lvl| lvl.x == current_position.0 && lvl.y == current_position.1)
+                    {
+                        let level_texture_src = find_level.texture.0.clone();
+                        let level_texture_dst = find_level.texture.1.clone();
+                        canvas.copy(&sheet, level_texture_src, level_texture_dst);
+                    }
+
+                    view_pos_x_count += TILES_SIZE as i32;
+                }
+            }
+
+            view_pos_x_count = start_x;
+            view_pos_y_count += TILES_SIZE as i32;
         }
     }
 }
@@ -120,63 +187,34 @@ fn draw_player(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Textu
     let old_player_y = app_state.player.y;
 
     let player_tile: i32 = {
-        if old_player_x != player_x {
-            if old_player_x > player_x {
-                TILE_ITEM_PLAYER_TURN_LEFT_POS as i32
-            } else {
-                TILE_ITEM_PLAYER_TURN_RIGHT_POS as i32
-            }
+        if PlayerAnimation::Up == app_state.player.animation.unwrap() {
+            TILE_ITEM_PLAYER_TURN_UP_POS as i32
+        } else if PlayerAnimation::Left == app_state.player.animation.unwrap() {
+            TILE_ITEM_PLAYER_TURN_LEFT_POS as i32
+        } else if PlayerAnimation::Right == app_state.player.animation.unwrap() {
+            TILE_ITEM_PLAYER_TURN_RIGHT_POS as i32
         } else {
-            if old_player_y > player_y {
-                TILE_ITEM_PLAYER_TURN_UP_POS as i32
-            } else {
-                TILE_ITEM_PLAYER_TURN_DOWN_POS as i32
-            }
+            TILE_ITEM_PLAYER_TURN_DOWN_POS as i32
         }
     };
 
     canvas.copy(
         &sheet,
-        Rect::new(
-            player_tile,
-            0,
-            TILES_SIZE,
-            TILES_SIZE,
-        ),
+        Rect::new(player_tile, 0, TILES_SIZE, TILES_SIZE),
         app_state.player.entity,
     );
 
-    // Player move from x position
-    // so we need to redraw behind player
-    if old_player_x != player_x {
-        if let Some(level_position) = app_state
+    // Redraw map behind player
+    if old_player_x != player_x || old_player_y != player_y {
+        let current_position = (old_player_x, old_player_y);
+        let find_level = app_state
             .level
             .iter()
-            .position(|lvl| lvl.x == old_player_x)
-        {
-            let level = app_state.level.get(level_position).unwrap();
-            canvas.copy(
-                &sheet,
-                Rect::new(level.texture.0, level.texture.1, TILES_SIZE, TILES_SIZE),
-                Rect::new(old_player_x, player_y, TILES_SIZE, TILES_SIZE),
-            );
-        }
-    }
-    // Player move from y position
-    // so we need to redraw behind player
-    else if old_player_y != player_y {
-        if let Some(level_position) = app_state
-            .level
-            .iter()
-            .position(|lvl| lvl.y == old_player_y)
-        {
-            let level = app_state.level.get(level_position).unwrap();
-            canvas.copy(
-                &sheet,
-                Rect::new(level.texture.0, level.texture.1, TILES_SIZE, TILES_SIZE),
-                Rect::new(player_x, old_player_y, TILES_SIZE, TILES_SIZE),
-            );
-        }
+            .find(|&lvl| lvl.x == current_position.0 && lvl.y == current_position.1)
+            .expect("cant find level position for redraw map behind player.");
+        let level_texture_src = find_level.texture.0.clone();
+        let level_texture_dst = find_level.texture.1.clone();
+        canvas.copy(&sheet, level_texture_src, level_texture_dst);
     }
 
     // Reset old player position
@@ -203,11 +241,8 @@ pub fn main() -> Result<(), String> {
     let game_sheet = Path::new("assets/tilemap/tilemap.png");
     let texture_game_sheet = texture_creator.load_texture(game_sheet)?;
 
-    // Draw de la map
-    draw_map(&mut app_state, &mut canvas, &texture_game_sheet);
-
-    // Draw du player
-    draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+    // Generate map
+    generate_map(&mut app_state, &mut canvas, &texture_game_sheet);
 
     canvas.present();
     let mut event_pump = sdl_context.event_pump()?;
@@ -228,7 +263,7 @@ pub fn main() -> Result<(), String> {
                     let new_pos = player_entity.y() + TILES_SIZE as i32;
                     if new_pos < (canvas.window().size().1 - TILES_SIZE) as i32 {
                         app_state.player.update_y(new_pos);
-                        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+                        app_state.player.animation = Some(PlayerAnimation::Down);
                     }
                 }
                 sdl2::event::Event::KeyDown {
@@ -238,7 +273,7 @@ pub fn main() -> Result<(), String> {
                     let new_pos = player_entity.y() - TILES_SIZE as i32;
                     if (player_entity.y() - TILES_SIZE as i32) > 0 {
                         app_state.player.update_y(new_pos);
-                        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+                        app_state.player.animation = Some(PlayerAnimation::Up);
                     }
                 }
                 sdl2::event::Event::KeyDown {
@@ -248,7 +283,7 @@ pub fn main() -> Result<(), String> {
                     let new_pos = player_entity.x() - TILES_SIZE as i32;
                     if (player_entity.x() - TILES_SIZE as i32) > 0 {
                         app_state.player.update_x(new_pos);
-                        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+                        app_state.player.animation = Some(PlayerAnimation::Left);
                     }
                 }
                 sdl2::event::Event::KeyDown {
@@ -260,13 +295,15 @@ pub fn main() -> Result<(), String> {
                         < (canvas.window().size().0 - TILES_SIZE) as i32
                     {
                         app_state.player.update_x(new_pos);
-                        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
+                        app_state.player.animation = Some(PlayerAnimation::Right);
                     }
                 }
                 _ => {}
             }
         }
 
+        draw_camera_map(&mut app_state, &mut canvas, &texture_game_sheet);
+        draw_player(&mut app_state, &mut canvas, &texture_game_sheet);
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
