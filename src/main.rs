@@ -35,7 +35,7 @@ struct PlayerCamera {
 }
 
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
-enum PlayerAnimation {
+enum PlayerDirection {
     Up,
     Down,
     Left,
@@ -46,7 +46,7 @@ enum PlayerAnimation {
 struct PlayerState {
     x: i32,
     y: i32,
-    animation: Option<PlayerAnimation>,
+    direction: Option<PlayerDirection>,
     entity: Rect,
     camera: PlayerCamera,
 }
@@ -85,7 +85,7 @@ impl AppSate {
             player: PlayerState {
                 x: player_x,
                 y: player_y,
-                animation: Some(PlayerAnimation::Down),
+                direction: Some(PlayerDirection::Down),
                 entity: Rect::new(player_x, player_y, TILES_SIZE, TILES_SIZE),
                 camera: PlayerCamera {
                     sizes: (WINDOW_SIZES.0 / 5, WINDOW_SIZES.1 / 5),
@@ -158,10 +158,8 @@ fn draw_camera_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &T
             for view_pos_x in start_x..end_x {
                 if view_pos_x == view_pos_x_count {
                     let current_position = (view_pos_x, view_pos_y);
-                    if let Some(find_level) = app_state
-                        .level
-                        .iter()
-                        .find(|&lvl| lvl.x == current_position.0 && lvl.y == current_position.1)
+
+                    if let Some(find_level) = find_level_width_position(app_state, current_position)
                     {
                         let level_texture_src = find_level.texture.0.clone();
                         let level_texture_dst = find_level.texture.1.clone();
@@ -178,6 +176,18 @@ fn draw_camera_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &T
     }
 }
 
+fn find_level_width_position(app_state: &AppSate, position: (i32, i32)) -> Option<&LevelState> {
+    if let Some(find_level) = app_state
+        .level
+        .iter()
+        .find(|&lvl| lvl.x == position.0 && lvl.y == position.1)
+    {
+        return Some(find_level);
+    }
+
+    None
+}
+
 /// Draw player in canvas
 fn draw_player(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
     let player_x = app_state.player.entity.x();
@@ -187,11 +197,11 @@ fn draw_player(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Textu
     let old_player_y = app_state.player.y;
 
     let player_tile: i32 = {
-        if PlayerAnimation::Up == app_state.player.animation.unwrap() {
+        if PlayerDirection::Up == app_state.player.direction.unwrap() {
             TILE_ITEM_PLAYER_TURN_UP_POS as i32
-        } else if PlayerAnimation::Left == app_state.player.animation.unwrap() {
+        } else if PlayerDirection::Left == app_state.player.direction.unwrap() {
             TILE_ITEM_PLAYER_TURN_LEFT_POS as i32
-        } else if PlayerAnimation::Right == app_state.player.animation.unwrap() {
+        } else if PlayerDirection::Right == app_state.player.direction.unwrap() {
             TILE_ITEM_PLAYER_TURN_RIGHT_POS as i32
         } else {
             TILE_ITEM_PLAYER_TURN_DOWN_POS as i32
@@ -247,9 +257,11 @@ pub fn main() -> Result<(), String> {
     canvas.present();
     let mut event_pump = sdl_context.event_pump()?;
     'main_loop: loop {
-        for event in event_pump.poll_iter() {
-            let player_entity = &app_state.player.entity;
+        canvas.clear();
+        let player_entity = app_state.player.entity;
+        let player_current_pos = (player_entity.x(), player_entity.y());
 
+        for event in event_pump.poll_iter() {
             match event {
                 sdl2::event::Event::Quit { .. }
                 | sdl2::event::Event::KeyDown {
@@ -260,42 +272,64 @@ pub fn main() -> Result<(), String> {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Down),
                     ..
                 } => {
-                    let new_pos = player_entity.y() + TILES_SIZE as i32;
-                    if new_pos < (canvas.window().size().1 - TILES_SIZE) as i32 {
-                        app_state.player.update_y(new_pos);
-                        app_state.player.animation = Some(PlayerAnimation::Down);
+                    let pos_y = player_current_pos.1 + TILES_SIZE as i32;
+                    if let Some(_) = find_level_width_position(
+                        &app_state,
+                        (
+                            player_current_pos.0,
+                            pos_y
+                        ),
+                    ) {
+                        app_state.player.update_y(pos_y);
+                        app_state.player.direction = Some(PlayerDirection::Down);
                     }
                 }
                 sdl2::event::Event::KeyDown {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Up),
                     ..
                 } => {
-                    let new_pos = player_entity.y() - TILES_SIZE as i32;
-                    if (player_entity.y() - TILES_SIZE as i32) > 0 {
-                        app_state.player.update_y(new_pos);
-                        app_state.player.animation = Some(PlayerAnimation::Up);
+                    let pos_y = player_current_pos.1 - TILES_SIZE as i32;
+                    if let Some(_) = find_level_width_position(
+                        &app_state,
+                        (
+                            player_current_pos.0,
+                            pos_y
+                        ),
+                    ) {
+                        app_state.player.update_y(pos_y);
+                        app_state.player.direction = Some(PlayerDirection::Up);
                     }
                 }
                 sdl2::event::Event::KeyDown {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Left),
                     ..
                 } => {
-                    let new_pos = player_entity.x() - TILES_SIZE as i32;
-                    if (player_entity.x() - TILES_SIZE as i32) > 0 {
-                        app_state.player.update_x(new_pos);
-                        app_state.player.animation = Some(PlayerAnimation::Left);
+                    let pos_x = player_current_pos.0 - TILES_SIZE as i32;
+                    if let Some(_) = find_level_width_position(
+                        &app_state,
+                        (
+                            pos_x,
+                            player_current_pos.1,
+                        ),
+                    ) {
+                        app_state.player.update_x(pos_x);
+                        app_state.player.direction = Some(PlayerDirection::Left);
                     }
                 }
                 sdl2::event::Event::KeyDown {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Right),
                     ..
                 } => {
-                    let new_pos = player_entity.x() + TILES_SIZE as i32;
-                    if (player_entity.x() + TILES_SIZE as i32)
-                        < (canvas.window().size().0 - TILES_SIZE) as i32
-                    {
-                        app_state.player.update_x(new_pos);
-                        app_state.player.animation = Some(PlayerAnimation::Right);
+                    let pos_x = player_current_pos.0 + TILES_SIZE as i32;
+                    if let Some(_) = find_level_width_position(
+                        &app_state,
+                        (
+                            pos_x,
+                            player_current_pos.1,
+                        ),
+                    ) {
+                        app_state.player.update_x(pos_x);
+                        app_state.player.direction = Some(PlayerDirection::Right);
                     }
                 }
                 _ => {}
