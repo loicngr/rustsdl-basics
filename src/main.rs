@@ -11,6 +11,8 @@ const WINDOW_SIZES: (u32, u32) = (640, 640);
 
 const TILES_SIZE: u32 = 16;
 const TILES_MARGIN: u32 = 1;
+const TILE_SCALE: u32 = 2;
+const TILE_TEXTURE_SIZE: u32 = TILES_SIZE * TILE_SCALE;
 
 const TILE_ITEM_DIRT_POS: (i32, i32) = (
     ((TILES_SIZE + TILES_MARGIN) * 6) as i32,
@@ -77,15 +79,15 @@ struct AppSate {
 
 impl AppSate {
     fn new() -> AppSate {
-        let player_x = 320 as i32;
-        let player_y = 320 as i32;
+        let player_x = MAP_SIZES.0 / 2;
+        let player_y = MAP_SIZES.1 / 2;
 
         AppSate {
             player: PlayerState {
                 x: player_x,
                 y: player_y,
                 direction: Some(PlayerDirection::None),
-                entity: Rect::new(player_x, player_y, TILES_SIZE, TILES_SIZE),
+                entity: Rect::new(player_x, player_y, TILE_TEXTURE_SIZE, TILE_TEXTURE_SIZE),
                 camera: PlayerCamera {
                     sizes: WINDOW_SIZES,
                 },
@@ -123,7 +125,7 @@ fn generate_map(app_state: &mut AppSate, _canvas: &mut WindowCanvas, _sheet: &Te
 
                     let texture_src: Rect = Rect::new(tile.0, tile.1, TILES_SIZE, TILES_SIZE);
                     let texture_dst: Rect =
-                        Rect::new(map_pos_x as i32, map_pos_y as i32, TILES_SIZE, TILES_SIZE);
+                        Rect::new(map_pos_x as i32, map_pos_y as i32, TILE_TEXTURE_SIZE, TILE_TEXTURE_SIZE);
 
                     app_state.level.push(LevelState {
                         x: map_pos_x as i32,
@@ -131,48 +133,15 @@ fn generate_map(app_state: &mut AppSate, _canvas: &mut WindowCanvas, _sheet: &Te
                         texture: (texture_src, texture_dst),
                     });
 
-                    map_pos_x_count += TILES_SIZE as i32;
+                    map_pos_x_count += TILE_TEXTURE_SIZE as i32;
                 }
             }
 
             map_pos_x_count = 0;
-            map_pos_y_count += TILES_SIZE as i32;
+            map_pos_y_count += TILE_TEXTURE_SIZE as i32;
         }
     }
 }
-
-// fn draw_camera_map(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
-//     let start_x: i32 = app_state.player.x as i32 - (app_state.player.camera.sizes.0 as i32 / 2);
-//     let end_x: i32 = app_state.player.x as i32 + (app_state.player.camera.sizes.0 as i32 / 2);
-
-//     let start_y: i32 = app_state.player.y as i32 - (app_state.player.camera.sizes.0 as i32 / 2);
-//     let end_y: i32 = app_state.player.y as i32 + (app_state.player.camera.sizes.0 as i32 / 2);
-
-//     let mut view_pos_y_count: i32 = start_y;
-//     let mut view_pos_x_count: i32 = start_x;
-
-//     for view_pos_y in start_y..end_y {
-//         if view_pos_y == view_pos_y_count {
-//             for view_pos_x in start_x..end_x {
-//                 if view_pos_x == view_pos_x_count {
-//                     let current_position = (view_pos_x, view_pos_y);
-
-//                     if let Some(find_level) = find_level_width_position(app_state, current_position)
-//                     {
-//                         let level_texture_src = find_level.texture.0.clone();
-//                         let level_texture_dst = find_level.texture.1.clone();
-//                         canvas.copy(&sheet, level_texture_src, level_texture_dst).unwrap();
-//                     }
-
-//                     view_pos_x_count += TILES_SIZE as i32;
-//                 }
-//             }
-
-//             view_pos_x_count = start_x;
-//             view_pos_y_count += TILES_SIZE as i32;
-//         }
-//     }
-// }
 
 /// Draw map from player camera position
 fn draw_map_from_camera(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Texture) {
@@ -237,11 +206,10 @@ fn draw_player(app_state: &mut AppSate, canvas: &mut WindowCanvas, sheet: &Textu
     // Redraw map behind player
     if old_player_x != player_x || old_player_y != player_y {
         let current_position = (old_player_x, old_player_y);
-        let find_level = app_state
-            .level
-            .iter()
-            .find(|&lvl| lvl.x == current_position.0 && lvl.y == current_position.1)
-            .expect("cant find level position for redraw map behind player.");
+
+        let find_level = find_level_width_position(&app_state, current_position)
+        .expect("cant find level position for redraw map behind player.");
+
         let level_texture_src = find_level.texture.0.clone();
         let level_texture_dst = find_level.texture.1.clone();
         canvas.copy(&sheet, level_texture_src, level_texture_dst).unwrap();
@@ -294,7 +262,7 @@ pub fn main() -> Result<(), String> {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Down),
                     ..
                 } => {
-                    let pos_y = player_current_pos.1 + TILES_SIZE as i32;
+                    let pos_y = player_current_pos.1 + ((TILES_SIZE * TILE_SCALE) as i32);
                     if let Some(_) = find_level_width_position(
                         &app_state,
                         (
@@ -311,7 +279,7 @@ pub fn main() -> Result<(), String> {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Up),
                     ..
                 } => {
-                    let pos_y = player_current_pos.1 - TILES_SIZE as i32;
+                    let pos_y = player_current_pos.1 - ((TILES_SIZE * TILE_SCALE) as i32);
                     if let Some(_) = find_level_width_position(
                         &app_state,
                         (
@@ -328,7 +296,7 @@ pub fn main() -> Result<(), String> {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Left),
                     ..
                 } => {
-                    let pos_x = player_current_pos.0 - TILES_SIZE as i32;
+                    let pos_x = player_current_pos.0 - ((TILES_SIZE * TILE_SCALE) as i32);
                     if let Some(_) = find_level_width_position(
                         &app_state,
                         (
@@ -345,7 +313,7 @@ pub fn main() -> Result<(), String> {
                     keycode: Option::Some(sdl2::keyboard::Keycode::Right),
                     ..
                 } => {
-                    let pos_x = player_current_pos.0 + TILES_SIZE as i32;
+                    let pos_x = player_current_pos.0 + ((TILES_SIZE * TILE_SCALE) as i32);
                     if let Some(_) = find_level_width_position(
                         &app_state,
                         (
